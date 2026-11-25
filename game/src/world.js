@@ -2,10 +2,12 @@
 // and the rush. Everything the game does lives in one step() call per frame; render.js only
 // paints the state this file keeps. Deterministic: all randomness comes from the seeded rng.
 import {
-  CHOP_SECONDS, COLORS, COMBO_STEP, DISH_IDS, FLOOR, FLAME_SPEED, GREEN_HALF,
+  CHOP_SECONDS, COLORS, COMBO_STEP, DINEIN, DISH_IDS, FLOOR, FLAME_SPEED, GREEN_HALF,
   INGREDIENTS, INTERACT_RADIUS, patienceSeconds, PERFECT_BONUS, PLAYER, RECIPES,
-  SHIFT_SECONDS, spawnIntervalSeconds, STATIONS, starThresholds, URGENT_SECONDS, YELLOW_HALF,
+  SHIFT_SECONDS, spawnIntervalSeconds, STATIONS, starThresholds, TEA, URGENT_SECONDS, YELLOW_HALF,
 } from './config.js';
+import { dinerAt, createDineIn, maybeSeatDiner, pourStep, serveTea, stepDineIn, tableOf } from './dinein.js';
+import { createRandom } from './random.js';
 import { sfx } from './audio.js';
 
 export const EVENT_TICKET = 1;
@@ -32,6 +34,9 @@ export function stationNear(state) {
   consider('wok', 'wok', w.x + w.w / 2, w.y + w.h / 2);
   const win = STATIONS.window;
   consider('window', 'window', win.x + win.w / 2, win.y + win.h / 2);
+  const teh = STATIONS.teh;
+  consider('teh', 'teh', teh.x + teh.w / 2, teh.y + teh.h / 2);
+  for (const table of STATIONS.tables) consider('table', table.id, table.cx, table.cy);
   return best;
 }
 
@@ -53,13 +58,16 @@ function matchingRecipe(items) {
   return null;
 }
 
-function burst(state, x, y, color, count, speed) {
+function burst(state, x, y, color, count, speed, rng) {
+  // rng defaults to the core game's stream; dine-in feedback passes the
+  // dine-in stream, so a tip burst never shifts the next ticket or flame.
+  const draw = rng || state.rng;
   for (let i = 0; i < count; i += 1) {
-    const angle = state.rng.range(0, Math.PI * 2);
-    const v = state.rng.range(speed * 0.4, speed);
+    const angle = draw.range(0, Math.PI * 2);
+    const v = draw.range(speed * 0.4, speed);
     state.particles.push({
       x, y, vx: Math.cos(angle) * v, vy: Math.sin(angle) * v - 40,
-      life: state.rng.range(0.4, 0.9), maxLife: 0.9, color, size: state.rng.range(2, 5),
+      life: draw.range(0.4, 0.9), maxLife: 0.9, color, size: draw.range(2, 5),
     });
   }
 }
@@ -155,10 +163,23 @@ function serveDish(state, dish) {
   const win = STATIONS.window;
   burst(state, win.x + 75, win.y + 20, '#ffd94d', 18, 150);
   floater(state, win.x + 75, win.y - 14, '+' + paid + ' Rp', '#ffd94d');
+  // Half of served dishes are eaten at a table instead of taken away: the
+  // customer sits down with the plate and a satisfaction meter starts draining.
+  // The roll lives on the dine-in stream, so the core game's own random draws
+  // (tickets, flame swings) are exactly what they were before dine-in existed.
+  const diner = maybeSeatDiner(state.dinein, dish);
+  if (diner) {
+    const table = tableOf(diner);
+    floater(state, table.cx, table.cy - 100, RECIPES[dish].label + ' — makan di tempat!', '#7dc383');
+  }
   return true;
 }
 
-export function createWorld(rng) {
+export function createWorld(rng, seed) {
+  // Dine-in runs on its own seeded stream, derived from the night's seed, so
+  // no dine-in draw ever shifts the core game's tickets or flame swings — the
+  // night plays exactly as it did before dine-in existed, plus the new loop.
+  const dineRng = createRandom(((typeof seed === 'number' ? (seed ^ 0xd1e17) >>> 0 : Math.floor(rng.next() * 4294967296)) || 1));
   const state = {
     rng,
     timeLeft: SHIFT_SECONDS,
@@ -172,6 +193,7 @@ export function createWorld(rng) {
     windowPlate: null,
     coins: 0, score: 0, combo: 0, bestCombo: 0,
     servedCount: 0, perfectCount: 0, burntCount: 0, expiredCount: 0,
+    dinein: createDineIn(dineRng),
     particles: [], floaters: [],
     hint: '', hintTimer: 0,
     over: false, stars: 0,
@@ -189,6 +211,7 @@ export function createWorld(rng) {
     state.windowPlate = null;
     state.coins = 0; state.score = 0; state.combo = 0; state.bestCombo = 0;
     state.servedCount = 0; state.perfectCount = 0; state.burntCount = 0; state.expiredCount = 0;
+    state.dinein = createDineIn(dineRng);
     state.particles = []; state.floaters = [];
     state.hint = ''; state.hintTimer = 0;
     state.over = false; state.stars = 0;
@@ -253,8 +276,15 @@ export function createWorld(rng) {
         state.hint = 'Bawa bahan ke wok dulu'; state.hintTimer = 1.5;
         return;
       }
-      // Drop the last carried ingredient into the wok.
-      const item = p.carry.pop();
+      // Drop the last carried ingredient into the wok — a carried Es Teh stays
+      // in hand, it is a drink for a diner, not wok stock.
+      let itemIndex = p.carry.length - 1;
+      while (itemIndex >= 0 && p.carry[itemIndex] === TEA.id) itemIndex -= 1;
+      if (itemIndex === -1) {
+        state.hint = 'Bawa bahan ke wok dulu'; state.hintTimer = 1.5;
+        return;
+      }
+      const item = p.carry.splice(itemIndex, 1)[0];
       wok.items.push(item);
       sfx.pickup();
       burst(state, STATIONS.wok.x + 95, STATIONS.wok.y + 25, INGREDIENTS[item].color, 8, 80);
@@ -270,6 +300,35 @@ export function createWorld(rng) {
         floater(state, STATIONS.wok.x + 95, STATIONS.wok.y - 10, 'Racikan salah!', '#e5484d');
         state.hint = 'Itu bukan resep apa-apa — cek papan resep'; state.hintTimer = 2;
       }
+      return;
+    }
+    if (near.kind === 'teh') {
+      // The pour itself is hold-to-fill (pourStep in step()); a tap just explains it.
+      if (p.carry.length >= PLAYER.carryMax) {
+        state.hint = 'Tangan penuh! (maks 3)'; state.hintTimer = 1.5; sfx.denied();
+      } else {
+        state.hint = 'Tahan E — tuang pas hijau!'; state.hintTimer = 1.5;
+      }
+      return;
+    }
+    if (near.kind === 'table') {
+      const teaIndex = p.carry.indexOf(TEA.id);
+      if (teaIndex === -1) {
+        const dn = dinerAt(state.dinein, near.id);
+        state.hint = dn ? 'Bawakan Es Teh biar dia senang!' : 'Meja ini masih kosong';
+        state.hintTimer = 1.5;
+        return;
+      }
+      const dn = serveTea(state.dinein, near.id);
+      if (!dn) {
+        state.hint = 'Tidak ada yang butuh teh di meja ini'; state.hintTimer = 1.5; sfx.denied();
+        return;
+      }
+      p.carry.splice(teaIndex, 1);
+      const table = tableOf(dn);
+      sfx.serve();
+      burst(state, table.cx, table.cy - 40, '#c96f3f', 10, 100, state.dinein.rng);
+      floater(state, table.cx, table.cy - 90, 'Es Teh! Puas +' + DINEIN.teaBoost, '#c96f3f');
       return;
     }
     if (near.kind === 'window') {
@@ -350,10 +409,32 @@ export function createWorld(rng) {
         state.hint = 'Wok dibersihkan'; state.hintTimer = 1.5;
       } else if (p.carry.length > 0) {
         const dropped = p.carry.pop();
-        floater(state, p.x, p.y - 40, 'Buang: ' + (RECIPES[dropped] ? RECIPES[dropped].label : INGREDIENTS[dropped].label), COLORS.muted);
+        const droppedLabel = RECIPES[dropped] ? RECIPES[dropped].label
+          : dropped === TEA.id ? TEA.label : INGREDIENTS[dropped].label;
+        floater(state, p.x, p.y - 40, 'Buang: ' + droppedLabel, COLORS.muted);
       }
     }
     chop(dt, input);
+
+    // Es Teh pour minigame at the drink station: hold E to fill, release green.
+    const pourResult = pourStep(state.dinein, dt, input, stationNear(state), state.player.carry.length >= PLAYER.carryMax);
+    if (pourResult === 'perfect' || pourResult === 'ok') {
+      state.player.carry.push(TEA.id);
+      sfx.pickup();
+      const teh = STATIONS.teh;
+      if (pourResult === 'perfect') {
+        state.combo += 1;
+        state.bestCombo = Math.max(state.bestCombo, state.combo);
+        floater(state, teh.x + teh.w / 2, teh.y - 16, 'Es Teh sempurna!', '#58c96b');
+      } else {
+        floater(state, teh.x + teh.w / 2, teh.y - 16, 'Es Teh dituang', '#f2c14e');
+      }
+    } else if (pourResult === 'spill') {
+      state.combo = 0;
+      sfx.burnt();
+      floater(state, STATIONS.teh.x + 50, STATIONS.teh.y - 16, 'Es teh tumpah!', '#e5484d');
+      state.hint = 'Tumpah! Tuang pas hijau'; state.hintTimer = 1.5;
+    }
 
     // Wok flame keeps swinging while a dish cooks.
     if (state.wok.cooking) {
@@ -391,6 +472,25 @@ export function createWorld(rng) {
       }
     }
     if (urgentBeep) sfx.urgent();
+
+    // Diners eat, satisfaction drains, tips and storm-offs land here.
+    for (const ev of stepDineIn(state.dinein, dt)) {
+      if (ev.type === 'tip') {
+        state.coins += ev.coins;
+        state.score += ev.coins;
+        state.combo += 1;
+        state.bestCombo = Math.max(state.bestCombo, state.combo);
+        sfx.serve();
+        burst(state, ev.x, ev.y, '#ffd94d', 14, 130, state.dinein.rng);
+        floater(state, ev.x, ev.y - 20, 'TIP +' + ev.coins + ' Rp', '#ffd94d');
+      } else {
+        state.coins = Math.max(0, state.coins - ev.coins);
+        state.score = Math.max(0, state.score - ev.coins);
+        state.combo = 0;
+        sfx.denied();
+        floater(state, ev.x, ev.y - 20, 'Kabur marah! -' + ev.coins + ' Rp', '#e5484d');
+      }
+    }
 
     if (state.hintTimer > 0) state.hintTimer -= dt;
 

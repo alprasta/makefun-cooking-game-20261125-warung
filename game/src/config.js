@@ -74,7 +74,43 @@ export const STATIONS = {
   board: { x: 660, y: 190, w: 170, h: 76, label: 'TALENAN' },
   wok:   { x: 872, y: 190, w: 190, h: 86, label: 'WOK' },
   window:{ x: 1104, y: 190, w: 150, h: 86, label: 'JENDELA SAJI' },
+  // Es Teh drink cart on the open floor, right side below the serving window:
+  // close enough to grab a tea on the way back from serving, far enough (145 px
+  // from the window's stand point) that it never steals a window interaction.
+  teh:   { x: 1150, y: 430, w: 100, h: 64, label: 'ES TEH' },
+  // Customer dining tables on the bottom floor; cx/cy is the table's centre,
+  // where a seated diner eats. The cook serves tea standing just below a table.
+  tables: [
+    { id: 'table1', x: 264, y: 566, w: 132, h: 118, cx: 330, cy: 630 },
+    { id: 'table2', x: 884, y: 566, w: 132, h: 118, cx: 950, cy: 630 },
+  ],
 };
+// --- dine-in + Es Teh --------------------------------------------------------
+// The drink the cook carries to a seated diner; it is stock, not a recipe item.
+export const TEA = { id: 'esTeh', label: 'Es Teh' };
+// seatChance: share of served dishes eaten at a table instead of taken away.
+// A diner finishes the plate in eatMin–eatMax seconds; satisfaction drains
+// 100 → 0 in satDrainSeconds with no tea, so one well-timed Es Teh (teaBoost)
+// is what saves the tip. tip = tipBase + satisfaction * tipPerSat on a happy
+// finish; an empty meter storms off and costs stormPenalty coins.
+export const DINEIN = {
+  seatChance: 0.5,
+  eatMin: 10, eatMax: 14,
+  satDrainSeconds: 12,
+  teaBoost: 45,
+  teaServeBelow: 90,
+  pourSeconds: 1.1,
+  pourSpeed: 2.6,
+  pourGreenHalf: 0.13,
+  pourYellowHalf: 0.30,
+  pourMinProgress: 0.35,
+  pourOverfillSeconds: 2.0,
+  pourSpillCooldown: 5,
+  tipBase: 25, tipPerSat: 0.6,
+  stormPenalty: 15,
+  shirts: ['#3f6fb5', '#c96f3f', '#58a34d', '#d9a7c7', '#7a5230'],
+};
+
 export const FLOOR = { top: 280, bottom: 700, left: 16, right: 1264 };
 export const PLAYER = { speed: 270, radius: 24, carryMax: 3 };
 export const INTERACT_RADIUS = 120;

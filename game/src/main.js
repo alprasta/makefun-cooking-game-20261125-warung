@@ -23,7 +23,7 @@ const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() 
 
 const canvas = document.getElementById('game');
 const status = document.getElementById('status');
-const world = createWorld(createRandom(seed));
+const world = createWorld(createRandom(seed), seed);
 const renderer = createRenderer(canvas);
 // Play-test hook (read-only from the outside): lets a headless driver inspect the live
 // world and drive it with synthetic keys without touching the game's own code paths.

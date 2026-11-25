@@ -16,6 +16,17 @@ with **Space** while the marker sits in the **green zone** for a perfect cook �
 is okay, red burns the dish and the wok has to be scraped clean. Every dish needs
 1–3 good tosses, and each perfect toss builds your combo.
 
+## Dine-in + Es Teh
+
+Half of the dishes you serve are eaten at the warung's two dining tables instead
+of taken away. A seated customer eats for 10–14 seconds while his **PUAS**
+(satisfaction) meter drains — pour him an **Es Teh** at the drink cart (hold **E**,
+let go while the marker is in the green, same timing game as the wok) and carry
+it to his table to top his satisfaction back up. Finish happy and he pays a
+**TIP** on top of the dish price; let the meter empty and he storms off angry —
+you lose the tip and a few coins. Keep the tables happy and the night pays more
+than the window alone.
+
 ## Recipes (each its own combination)
 
 - **Nasi Goreng** — nasi + telur + bawang cincang + kecap (3 tosses)
@@ -36,7 +47,7 @@ and your best combo.
 ## Controls
 
 - **WASD / arrow keys** — walk (or click a spot to walk there)
-- **E** — pick up / chop (hold) / add to wok / serve
+- **E** — pick up / chop (hold) / add to wok / serve / pour Es Teh (hold) / serve tea to a table
 - **Space** — toss the wok
 - **Q** — discard what you carry (or clean the wok)
 - **P** — pause, **Enter** — start / next shift

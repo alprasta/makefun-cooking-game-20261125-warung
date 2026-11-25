@@ -2,8 +2,9 @@
 // the crates, the chopping board, the wok with its flame meter, the serving window, the cook,
 // the tickets and the HUD. No images, no fonts from the network — shapes and the system font.
 import {
-  COLORS, DISH_IDS, FLOOR, INGREDIENTS, RECIPES, SHIFT_SECONDS, STATIONS, VIEW,
+  COLORS, DISH_IDS, FLOOR, INGREDIENTS, RECIPES, SHIFT_SECONDS, STATIONS, TEA, VIEW,
 } from './config.js';
+import { dinerAt } from './dinein.js';
 import { stationNear } from './world.js';
 
 export const SCREEN_TITLE = 'title';
@@ -430,6 +431,39 @@ function drawDishFood(ctx, x, y, r, dishId, inWok) {
   ctx.restore();
 }
 
+/** A glass of es teh: clear glass, amber tea, ice cubes, red straw. */
+function drawTeaGlass(ctx, x, y, r) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(245,236,215,0.92)';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.55, -r);
+  ctx.lineTo(r * 0.55, -r);
+  ctx.lineTo(r * 0.4, r);
+  ctx.lineTo(-r * 0.4, r);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#c96f3f';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.45, -r * 0.55);
+  ctx.lineTo(r * 0.45, -r * 0.55);
+  ctx.lineTo(r * 0.32, r * 0.85);
+  ctx.lineTo(-r * 0.32, r * 0.85);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.fillRect(-r * 0.22, -r * 0.45, r * 0.22, r * 0.22);
+  ctx.fillRect(r * 0.04, -r * 0.08, r * 0.2, r * 0.2);
+  ctx.strokeStyle = '#d9381e';
+  ctx.lineWidth = Math.max(1.5, r * 0.14);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(r * 0.1, -r * 0.5);
+  ctx.lineTo(r * 0.45, -r * 1.15);
+  ctx.stroke();
+  ctx.restore();
+}
+
 /** A plate with the dish on it, drawn big enough to read at a glance. */
 function drawPlate(ctx, x, y, r, dishId) {
   ctx.fillStyle = '#f7f2e7';
@@ -457,10 +491,53 @@ function drawStool(ctx, x, y, r, legLen) {
   ctx.fill();
 }
 
-/** A customer dining table (meja makan): far stool, wooden top, a plate of food
- *  and two glasses of teh on it, near stool. The stools match the table's wood. */
-function drawDiningTable(ctx, tx, ty, dishId) {
+/** A seated diner: shirt, arms on the table, head with a face that shows how
+ *  happy he is — smile above 60 satisfaction, flat 30–60, frown and angry
+ *  eyebrows below 30, when he is about to storm off. */
+function drawDiner(ctx, tx, ty, diner, time) {
+  const bob = Math.sin(time * 3 + tx) * 1.5;
+  ctx.save();
+  ctx.translate(tx, ty - 46 + bob);
+  ctx.fillStyle = diner.shirt;
+  roundRect(ctx, -16, -30, 32, 34, 10);
+  ctx.fill();
+  ctx.strokeStyle = diner.shirt;
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-12, -18); ctx.lineTo(-20, 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(12, -18); ctx.lineTo(20, 2); ctx.stroke();
+  ctx.fillStyle = '#f2c19b';
+  ctx.beginPath(); ctx.arc(0, -40, 12, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2b1c12';
+  ctx.beginPath(); ctx.arc(0, -43, 12, Math.PI, 0); ctx.fill();
+  ctx.fillRect(-12, -44, 24, 4);
+  const sat = diner.satisfaction;
+  ctx.fillStyle = '#2b1c12';
+  ctx.beginPath(); ctx.arc(-4.5, -40, 1.6, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(4.5, -40, 1.6, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#2b1c12';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  if (sat > 60) ctx.arc(0, -36, 5, 0.15 * Math.PI, 0.85 * Math.PI);
+  else if (sat > 30) { ctx.moveTo(-4, -34); ctx.lineTo(4, -34); }
+  else ctx.arc(0, -30, 5, 1.15 * Math.PI, 1.85 * Math.PI);
+  ctx.stroke();
+  if (sat <= 30) {
+    ctx.beginPath(); ctx.moveTo(-8, -46); ctx.lineTo(-2, -43.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8, -46); ctx.lineTo(2, -43.5); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** A customer dining table (meja makan): far stool, wooden top, a plate — the
+ *  diner's dish when someone sits there, empty when the table is free — and
+ *  teh glasses (one always, a second one appears when the diner got his Es Teh),
+ *  near stool. A seated diner eats behind the table with a PUAS bar above him. */
+function drawDiningTable(ctx, state, table, diner, time) {
+  const tx = table.cx;
+  const ty = table.cy;
   drawStool(ctx, tx, ty - 46, 20, 32);
+  if (diner) drawDiner(ctx, tx, ty, diner, time);
   ctx.fillStyle = '#5d3c22';
   ctx.fillRect(tx - 54, ty + 10, 8, 30);
   ctx.fillRect(tx + 46, ty + 10, 8, 30);
@@ -470,16 +547,48 @@ function drawDiningTable(ctx, tx, ty, dishId) {
   ctx.fillStyle = '#a87f52';
   roundRect(ctx, tx - 66, ty - 14, 132, 8, 6);
   ctx.fill();
-  drawPlate(ctx, tx - 28, ty - 26, 13, dishId);
-  ctx.fillStyle = '#f5ecd7';
-  ctx.fillRect(tx + 18, ty - 32, 10, 18);
-  ctx.fillStyle = '#c96f3f';
-  ctx.fillRect(tx + 19, ty - 24, 8, 9);
-  ctx.fillStyle = '#f5ecd7';
-  ctx.fillRect(tx + 34, ty - 32, 10, 18);
-  ctx.fillStyle = '#c96f3f';
-  ctx.fillRect(tx + 35, ty - 24, 8, 9);
+  if (diner) drawPlate(ctx, tx - 28, ty - 26, 13, diner.dish);
+  else {
+    ctx.fillStyle = '#f7f2e7';
+    ctx.beginPath();
+    ctx.arc(tx - 28, ty - 26, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#c9b98f';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  drawTeaGlass(ctx, tx + 24, ty - 28, 9);
+  if (diner && diner.teaGlass) drawTeaGlass(ctx, tx + 42, ty - 28, 9);
   drawStool(ctx, tx, ty + 54, 22, 22);
+  if (diner) {
+    // Satisfaction bar: green while happy, red when he is about to leave.
+    const ratio = Math.max(0, diner.satisfaction / 100);
+    const bx = tx - 36;
+    const by = ty - 128;
+    const bw = 72;
+    const bh = 10;
+    text(ctx, 'PUAS', tx, by - 9, 9, COLORS.cream, 800, 'center');
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    roundRect(ctx, bx - 2, by - 2, bw + 4, bh + 4, 5);
+    ctx.fill();
+    ctx.fillStyle = '#e5d9bd';
+    roundRect(ctx, bx, by, bw, bh, 4);
+    ctx.fill();
+    ctx.fillStyle = ratio > 0.5 ? COLORS.green : ratio > 0.25 ? COLORS.yellow : COLORS.red;
+    if (ratio > 0) {
+      roundRect(ctx, bx, by, bw * ratio, bh, 4);
+      ctx.fill();
+    }
+  }
+  const near = stationNear(state);
+  if (near && near.kind === 'table' && near.id === table.id) {
+    ctx.strokeStyle = '#ffd94d';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 6]);
+    roundRect(ctx, tx - 72, ty - 64, 144, 132, 12);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
 
 /** The night-warung busker (pengamen): cap, striped shirt, guitar, a tip hat
@@ -592,6 +701,41 @@ function drawFlameMeter(ctx, wok, x, y, w) {
   text(ctx, 'TOSS ' + Math.max(0, wok.tossesLeft) + 'x', x + w + 10, y + 8, 13, COLORS.cream, 800);
 }
 
+function drawPourMeter(ctx, pour, x, y, w) {
+  // Same language as the wok flame meter: red bed, yellow band, green heart,
+  // white marker — let go while the marker sits in the green. The amber bar
+  // below shows how full the glass is.
+  const marker = Math.sin(pour.phase) * 0.85;
+  text(ctx, 'TUANG', x - 8, y + 8, 11, COLORS.cream, 700, 'right');
+  ctx.fillStyle = '#7a1f1f';
+  roundRect(ctx, x, y, w, 16, 8);
+  ctx.fill();
+  const toX = (v) => x + ((v + 1) / 2) * w;
+  ctx.fillStyle = COLORS.yellow;
+  ctx.fillRect(toX(pour.greenCenter - 0.30), y + 2, toX(pour.greenCenter + 0.30) - toX(pour.greenCenter - 0.30), 12);
+  ctx.fillStyle = COLORS.green;
+  ctx.fillRect(toX(pour.greenCenter - 0.13), y, toX(pour.greenCenter + 0.13) - toX(pour.greenCenter - 0.13), 16);
+  const mx = toX(marker);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(mx, y - 6);
+  ctx.lineTo(mx - 8, y - 16);
+  ctx.lineTo(mx + 8, y - 16);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#2b1c12';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = '#e5d9bd';
+  roundRect(ctx, x, y + 22, w, 7, 3);
+  ctx.fill();
+  ctx.fillStyle = '#c96f3f';
+  if (pour.progress > 0) {
+    roundRect(ctx, x, y + 22, w * pour.progress, 7, 3);
+    ctx.fill();
+  }
+}
+
 function drawCook(ctx, player, carrying, time) {
   const { x, y } = player;
   const bob = Math.sin(time * 10) * 1.5;
@@ -627,6 +771,7 @@ function drawCook(ctx, player, carrying, time) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.arc(ix, iy, 12, 0, Math.PI * 2); ctx.fill();
     if (RECIPES[item]) drawPlate(ctx, ix, iy, 11, item);
+    else if (item === TEA.id) drawTeaGlass(ctx, ix, iy, 11);
     else drawIngredient(ctx, ix, iy, 10, item);
   });
   ctx.restore();
@@ -709,8 +854,10 @@ export function createRenderer(canvas) {
     ctx.fillStyle = '#4a2e18';
     ctx.fillRect(20, 288, 1240, 8);
     // Customer dining tables with matching stools, and the busker by the wall.
-    drawDiningTable(ctx, 330, 630, 'nasiGoreng');
-    drawDiningTable(ctx, 950, 630, 'sotoAyam');
+    // A seated diner (if any) eats at each table with his PUAS bar above him.
+    for (const table of STATIONS.tables) {
+      drawDiningTable(ctx, state, table, state.dinein ? dinerAt(state.dinein, table.id) : null, time);
+    }
     drawBusker(ctx, 1150, 625, time);
     // Woven mat the cook stands on, and the props at the floor's edges.
     ctx.fillStyle = '#6b4a2f';
@@ -857,6 +1004,38 @@ export function createRenderer(canvas) {
       text(ctx, 'antar hidangan (E)', win.x + win.w / 2, win.y + 72, 11, COLORS.muted, 600, 'center');
     }
     highlight('window', null, win.x, win.y, win.w, win.h);
+    // Es Teh station: a drink cart with a glass dispenser of amber tea, a tap,
+    // and a stack of cups. Hold E here to pour a glass for a seated diner; the
+    // pour meter appears above the cart while a pour is running.
+    const teh = STATIONS.teh;
+    ctx.fillStyle = '#5d3c22';
+    roundRect(ctx, teh.x, teh.y, teh.w, teh.h, 8);
+    ctx.fill();
+    ctx.fillStyle = '#8a6a42';
+    ctx.fillRect(teh.x, teh.y, teh.w, 6);
+    ctx.fillStyle = 'rgba(245,236,215,0.9)';
+    roundRect(ctx, teh.x + 12, teh.y + 12, 44, 40, 6);
+    ctx.fill();
+    ctx.fillStyle = '#c96f3f';
+    roundRect(ctx, teh.x + 16, teh.y + 26, 36, 22, 4);
+    ctx.fill();
+    ctx.fillStyle = '#f5ecd7';
+    ctx.fillRect(teh.x + 14, teh.y + 8, 40, 5);
+    ctx.fillStyle = '#2b1c12';
+    ctx.fillRect(teh.x + 30, teh.y + 50, 6, 8);
+    ctx.fillStyle = '#8f97a3';
+    ctx.fillRect(teh.x + 28, teh.y + 56, 10, 4);
+    ctx.fillStyle = '#f5ecd7';
+    ctx.fillRect(teh.x + 64, teh.y + 30, 12, 16);
+    ctx.fillRect(teh.x + 66, teh.y + 22, 8, 10);
+    drawTeaGlass(ctx, teh.x + 84, teh.y + 40, 9);
+    if (state.dinein && state.dinein.pour.active) {
+      drawPourMeter(ctx, state.dinein.pour, teh.x - 15, teh.y - 44, teh.w + 30);
+    } else {
+      text(ctx, teh.label, teh.x + teh.w / 2, teh.y - 12, 12, COLORS.cream, 800, 'center');
+      text(ctx, 'tahan E', teh.x + teh.w / 2, teh.y + teh.h + 12, 11, COLORS.muted, 600, 'center');
+    }
+    highlight('teh', null, teh.x, teh.y, teh.w, teh.h);
   }
 
   function drawTickets(state) {
@@ -888,7 +1067,7 @@ export function createRenderer(canvas) {
     text(ctx, 'KOİN', 24, 12, 10, COLORS.muted, 700);
     const comboText = state.combo > 1 ? 'COMBO x' + (1 + state.combo * 0.1).toFixed(1) + '  (' + state.combo + ')' : 'COMBO —';
     text(ctx, comboText, 1050, 18, 15, state.combo > 1 ? '#58c96b' : COLORS.muted, 800, 'center');
-    text(ctx, 'Disaji: ' + state.servedCount + '   Sempurna: ' + state.perfectCount, 1050, 40, 13, COLORS.cream, 600, 'center');
+    text(ctx, 'Disaji: ' + state.servedCount + '   Sempurna: ' + state.perfectCount + '   Tip: Rp ' + (state.dinein ? state.dinein.stats.tipCoins : 0), 1050, 40, 13, COLORS.cream, 600, 'center');
     const rush = 1 - state.timeLeft / SHIFT_SECONDS;
     const rushLabel = rush < 0.33 ? 'Malam tenang' : rush < 0.66 ? 'Mulai ramai' : 'JAM SIBUK!';
     text(ctx, rushLabel, 880, 30, 15, rush >= 0.66 ? COLORS.red : COLORS.muted, 800, 'center');
@@ -931,8 +1110,10 @@ export function createRenderer(canvas) {
       'SPASI — lempar wok pas penanda di zona HIJAU   •   Q — buang   •   P — jeda',
       'Cincang ayam & bawang di talenan. Racik resepnya benar, atau wok-nya gosong.',
       'Pesanan datang makin cepat — layani sebelum kesabarannya habis!',
+      'Separuh pesanan dimakan di tempat: sajikan Es Teh (tahan E di gerobak ES TEH)',
+      'ke mejanya sebelum kepuasannya habis — pelanggan senang bayar TIP!',
     ];
-    lines.forEach((line, i) => text(ctx, line, 640, 310 + i * 30, 16, COLORS.muted, 600, 'center'));
+    lines.forEach((line, i) => text(ctx, line, 640, 300 + i * 26, 16, COLORS.muted, 600, 'center'));
     text(ctx, 'Tekan ENTER untuk buka warung', 640, 470, 24, '#58c96b', 800, 'center');
     if (best > 0) text(ctx, 'Rekor koin: Rp ' + best, 640, 510, 16, COLORS.cream, 600, 'center');
     // The five dishes, so the first frame already teaches the recipes.
@@ -968,6 +1149,7 @@ export function createRenderer(canvas) {
       ctx.closePath();
       ctx.fill();
     }
+    const dinein = state.dinein ? state.dinein.stats : { seated: 0, teasServed: 0, tipCoins: 0 };
     const rows = [
       ['Koin malam ini', 'Rp ' + state.coins],
       ['Hidangan disajikan', String(state.servedCount)],
@@ -975,9 +1157,12 @@ export function createRenderer(canvas) {
       ['Combo terbaik', String(state.bestCombo)],
       ['Hidangan gosong', String(state.burntCount)],
       ['Order hangus', String(state.expiredCount)],
+      ['Makan di tempat', dinein.seated + ' pelanggan'],
+      ['Es Teh disajikan', dinein.teasServed + ' gelas'],
+      ['Tip pelanggan', 'Rp ' + dinein.tipCoins],
     ];
     rows.forEach((row, i) => {
-      const y = 350 + i * 34;
+      const y = 332 + i * 28;
       text(ctx, row[0], 480, y, 18, COLORS.muted, 600);
       text(ctx, row[1], 800, y, 18, COLORS.cream, 800, 'right');
     });

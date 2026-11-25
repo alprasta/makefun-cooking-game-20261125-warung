@@ -2,7 +2,8 @@
 // real rules forward from a fresh world, steered by a small autopilot that walks the cook
 // between the crates, the board, the wok and the serving window, so the frame is what a real
 // game looks like and the same seed always gives the same frame.
-import { DISH_IDS, INGREDIENTS, RECIPES, SHIFT_SECONDS, STATIONS, STEP } from './config.js';
+import { DINEIN, DISH_IDS, INGREDIENTS, PLAYER, RECIPES, SHIFT_SECONDS, STATIONS, STEP, TEA } from './config.js';
+import { neediestDiner, neediestTeaDiner, stageDiner } from './dinein.js';
 import { EVENT_OVER, stationNear } from './world.js';
 import { SCREEN_OVER, SCREEN_PLAY } from './render.js';
 
@@ -11,6 +12,12 @@ const SAMPLE = STEP;
 /** Where the autopilot wants to stand to use a station (just below it, on the floor). */
 function standPoint(station) {
   return { x: station.x + station.w / 2, y: station.y + station.h + 42 };
+}
+
+/** Where the autopilot stands to serve a dining table: just below it — the
+ *  table's own rect would put the cook past the floor's bottom edge. */
+function tableStandPoint(table) {
+  return { x: table.cx, y: table.cy + 46 };
 }
 
 function crateFor(ingredient) {
@@ -55,6 +62,8 @@ function lastCarriedIsStale(state, ticket) {
   if (p.carry.length === 0) return false;
   const last = p.carry[p.carry.length - 1];
   if (RECIPES[last]) return false;
+  // A carried Es Teh is a delivery, never stale stock.
+  if (last === TEA.id) return false;
   const lastAsChopped = (INGREDIENTS[last] && INGREDIENTS[last].chopped) || last;
   const wanted = [...RECIPES[ticket.dish].needs];
   for (const item of state.wok.items) {
@@ -99,6 +108,36 @@ export function autopilot(state) {
     const marker = Math.sin(wok.phase) * 0.85;
     const arrived = goTo(standPoint(STATIONS.wok));
     if (arrived && Math.abs(marker - wok.greenCenter) <= 0.1) out.tossPressed = true;
+    return out;
+  }
+  // 3b. A carried Es Teh goes to the diner who needs it most; if nobody needs
+  // one, the glass is dead weight — throw it away and free the hand.
+  if (p.carry.includes(TEA.id)) {
+    const needy = neediestDiner(state.dinein);
+    if (needy && needy.satisfaction < DINEIN.teaServeBelow) {
+      const table = STATIONS.tables.find((t) => t.id === needy.tableId);
+      if (goTo(tableStandPoint(table))) out.interactPressed = true;
+      return out;
+    }
+    out.discardPressed = true;
+    return out;
+  }
+  // 3c. A diner who will storm off before finishing without a tea is worth a
+  // detour to the Es Teh station — and the need is known the moment he sits
+  // down, while the cook is still at the window right above the drink cart.
+  // Diners whose meal ends before their satisfaction does never trigger this.
+  const needy = neediestTeaDiner(state.dinein);
+  if (needy && p.carry.length < PLAYER.carryMax && state.dinein.pour.cooldown <= 0) {
+    const pour = state.dinein.pour;
+    const arrived = goTo(standPoint(STATIONS.teh));
+    if (arrived) {
+      const marker = Math.sin(pour.phase) * 0.85;
+      if (pour.active && pour.progress >= 0.4 && Math.abs(marker - pour.greenCenter) <= 0.1) {
+        // Release: the pour resolves in the green.
+      } else {
+        out.interactHeld = true;
+      }
+    }
     return out;
   }
   // 4. A plate waiting at the window with no ticket yet gets picked back up.
@@ -216,6 +255,10 @@ export function stageShot(name, world) {
       state.wok.phase = 0.6;
       state.wok.greenCenter = 0.15;
     }
+    // Late shift, both tables full: one diner happy with his teh, one about
+    // to storm off — the red PUAS bar is the drama of the frame.
+    stageDiner(state.dinein, 'table1', 'mieGoreng', 68, true, 6);
+    stageDiner(state.dinein, 'table2', 'gadoGado', 28, false, 9);
     clearTransientFx(state);
     return { screen: SCREEN_PLAY, best: state.coins };
   }
@@ -253,7 +296,11 @@ export function stageShot(name, world) {
   const wokPoint = standPoint(STATIONS.wok);
   state.player.x = wokPoint.x - 27;
   state.player.y = wokPoint.y + 12;
-  if (state.player.carry.length === 0) state.player.carry = ['telur'];
+  // Dine-in sells the new depth at a glance: one happy diner mid-meal with a
+  // teh glass, one getting impatient, and the cook carrying an Es Teh.
+  stageDiner(state.dinein, 'table1', 'nasiGoreng', 74, true, 5);
+  stageDiner(state.dinein, 'table2', 'sotoAyam', 52, false, 7);
+  state.player.carry = ['esTeh', 'telur'];
   state.timeLeft = 132;
   clearTransientFx(state);
   return { screen: SCREEN_PLAY, best: state.coins };
