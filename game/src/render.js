@@ -29,21 +29,405 @@ function text(ctx, str, x, y, size, color, weight, align) {
   ctx.fillText(str, x, y);
 }
 
-/** A little pile of one ingredient: a coloured blob with a darker rim and a highlight. */
-function ingredientBlob(ctx, x, y, r, id) {
-  const info = INGREDIENTS[id];
-  ctx.fillStyle = info.color;
+/** One wavy noodle strand, drawn across the icon. */
+function noodleStrand(ctx, r, y0, phase, color, width) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  for (let px = -r * 0.85; px <= r * 0.85; px += 2) {
+    const py = y0 + Math.sin((px / r) * Math.PI * 2 + phase) * r * 0.22;
+    if (px === -r * 0.85) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+}
+
+/** A leaf, drawn upright; the caller rotates it. */
+function leaf(ctx, r, color) {
+  ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(x, y + r * 0.25, r * 0.7, 0, Math.PI);
+  ctx.ellipse(0, -r * 0.25, r * 0.34, r * 0.72, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+  ctx.lineWidth = Math.max(1, r * 0.07);
   ctx.beginPath();
-  ctx.arc(x - r * 0.3, y - r * 0.35, r * 0.28, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(0, -r * 0.85);
+  ctx.lineTo(0, r * 0.35);
+  ctx.stroke();
+}
+
+/**
+ * One ingredient, drawn as the food itself — a bowl of white rice, a nest of
+ * noodles, a fried egg — never a plain coloured ball. Each icon is a small
+ * picture: bowl, yolk, leaves, drumstick, onion rings, sauce bottle, chilli
+ * bowl, crispy flakes. Every place an ingredient shows (crates, tickets,
+ * recipe strip, wok, board, carried stack) calls this one function, so the
+ * pictures stay consistent. All shapes are sized from r, the icon's radius,
+ * so they still read at the tiny r=6 of the recipe strip.
+ */
+function drawIngredient(ctx, x, y, r, id) {
+  ctx.save();
+  ctx.translate(x, y);
+  const lw = Math.max(1, r * 0.09);
+  switch (id) {
+    case 'nasi': {
+      // Bowl of white rice: blue bowl, white mound, a few grain marks.
+      ctx.fillStyle = '#3f6fb5';
+      ctx.beginPath();
+      ctx.arc(0, r * 0.1, r * 0.8, 0, Math.PI);
+      ctx.fill();
+      ctx.fillStyle = '#fff8ea';
+      ctx.beginPath();
+      ctx.arc(0, r * 0.1, r * 0.68, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = '#d8cbb0';
+      ctx.lineWidth = lw;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.35, -r * 0.35); ctx.lineTo(-r * 0.2, -r * 0.55);
+      ctx.moveTo(0, -r * 0.3); ctx.lineTo(r * 0.12, -r * 0.55);
+      ctx.moveTo(r * 0.3, -r * 0.35); ctx.lineTo(r * 0.42, -r * 0.5);
+      ctx.stroke();
+      break;
+    }
+    case 'mie': {
+      // Noodle nest: three wavy golden strands.
+      noodleStrand(ctx, r, -r * 0.38, 0, '#f2c14e', r * 0.3);
+      noodleStrand(ctx, r, 0, 2.1, '#e8a13c', r * 0.3);
+      noodleStrand(ctx, r, r * 0.38, 4.2, '#ffd97a', r * 0.3);
+      break;
+    }
+    case 'telur': {
+      // Fried egg: white oval, yolk in the middle.
+      ctx.fillStyle = '#fffdf5';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.95, r * 0.72, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#e8dfc8';
+      ctx.lineWidth = lw;
+      ctx.stroke();
+      ctx.fillStyle = '#ffb61e';
+      ctx.beginPath();
+      ctx.arc(r * 0.08, -r * 0.05, r * 0.42, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffd97a';
+      ctx.beginPath();
+      ctx.arc(-r * 0.05, -r * 0.18, r * 0.14, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'sayur': {
+      // Leafy greens: three leaves with veins.
+      ctx.save(); ctx.rotate(-0.5); leaf(ctx, r, '#58a34d'); ctx.restore();
+      ctx.save(); ctx.rotate(0.45); leaf(ctx, r, '#7dc383'); ctx.restore();
+      leaf(ctx, r, '#6db35f');
+      break;
+    }
+    case 'ayam': {
+      // Chicken drumstick: pink meat, white bone with knobs.
+      ctx.save();
+      ctx.rotate(-0.6);
+      ctx.fillStyle = '#e8a08a';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.15, r * 0.2, r * 0.62, r * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#d97f66';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.3, r * 0.38, r * 0.35, r * 0.25, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#f5f0e6';
+      ctx.lineWidth = r * 0.22;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(r * 0.3, -r * 0.15);
+      ctx.lineTo(r * 0.68, -r * 0.52);
+      ctx.stroke();
+      ctx.fillStyle = '#f5f0e6';
+      ctx.beginPath(); ctx.arc(r * 0.66, -r * 0.6, r * 0.16, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.8, -r * 0.48, r * 0.16, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      break;
+    }
+    case 'bawang': {
+      // Onion: pale bulb with layer rings and a green sprout.
+      ctx.fillStyle = '#d9a7c7';
+      ctx.beginPath();
+      ctx.arc(0, r * 0.05, r * 0.85, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#b57e9e';
+      ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.arc(0, r * 0.05, r * 0.58, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, r * 0.05, r * 0.3, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#58a34d';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.18, -r * 0.72);
+      ctx.lineTo(0, -r * 1.0);
+      ctx.lineTo(r * 0.18, -r * 0.72);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'kecap': {
+      // Soy-sauce bottle: dark body, red cap, cream label. Light outline so it
+      // still reads on the dark wok and recipe strip.
+      ctx.fillStyle = '#3a2418';
+      roundRect(ctx, -r * 0.42, -r * 0.15, r * 0.84, r * 0.95, r * 0.18);
+      ctx.fill();
+      ctx.strokeStyle = '#d8cbb0';
+      ctx.lineWidth = lw;
+      ctx.stroke();
+      ctx.fillStyle = '#3a2418';
+      ctx.fillRect(-r * 0.2, -r * 0.62, r * 0.4, r * 0.5);
+      ctx.fillStyle = '#d9381e';
+      roundRect(ctx, -r * 0.28, -r * 0.95, r * 0.56, r * 0.36, r * 0.08);
+      ctx.fill();
+      ctx.fillStyle = '#f5ecd7';
+      ctx.fillRect(-r * 0.28, r * 0.18, r * 0.56, r * 0.34);
+      break;
+    }
+    case 'sambal': {
+      // Bowl of red sambal: dark bowl, red mound, chilli flecks.
+      ctx.fillStyle = '#4a2c1c';
+      ctx.beginPath();
+      ctx.arc(0, r * 0.15, r * 0.78, 0, Math.PI);
+      ctx.fill();
+      ctx.fillStyle = '#d9381e';
+      ctx.beginPath();
+      ctx.arc(0, r * 0.15, r * 0.66, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#a01e10';
+      ctx.beginPath(); ctx.arc(-r * 0.3, -r * 0.3, r * 0.11, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.05, -r * 0.42, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.35, -r * 0.22, r * 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#58c96b';
+      ctx.beginPath(); ctx.arc(r * 0.18, -r * 0.28, r * 0.08, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'bwgGoreng': {
+      // Fried shallots: a pile of golden crispy flakes.
+      const flakes = [
+        [-0.45, 0.3, -0.4, 0.3, 0.13, '#c98a3d'],
+        [0, 0.45, 0.2, 0.34, 0.14, '#e0a44f'],
+        [0.45, 0.25, 0.7, 0.3, 0.13, '#a86428'],
+        [-0.2, -0.15, 0.1, 0.3, 0.12, '#f2c14e'],
+        [0.3, -0.25, -0.5, 0.28, 0.12, '#c98a3d'],
+        [0, -0.5, 0.9, 0.26, 0.11, '#e0a44f'],
+      ];
+      for (const [fx, fy, rot, frx, fry, color] of flakes) {
+        ctx.save();
+        ctx.translate(fx * r, fy * r);
+        ctx.rotate(rot);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, frx * r, fry * r, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      break;
+    }
+    case 'ayamCincang': {
+      // Diced chicken: three pink cubes with darker edges.
+      const cubes = [
+        [-0.35, 0.3, 0.15, '#eda58f'],
+        [0.3, 0.35, -0.2, '#e8a08a'],
+        [0, -0.35, 0.4, '#f2b09a'],
+      ];
+      for (const [cx, cy, rot, color] of cubes) {
+        ctx.save();
+        ctx.translate(cx * r, cy * r);
+        ctx.rotate(rot);
+        ctx.fillStyle = color;
+        ctx.fillRect(-r * 0.3, -r * 0.3, r * 0.6, r * 0.6);
+        ctx.strokeStyle = '#d97f66';
+        ctx.lineWidth = lw;
+        ctx.strokeRect(-r * 0.3, -r * 0.3, r * 0.6, r * 0.6);
+        ctx.restore();
+      }
+      ctx.fillStyle = '#fff8ea';
+      ctx.beginPath(); ctx.arc(r * 0.42, -r * 0.42, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'bawangCincang': {
+      // Chopped onion: small pale rings and bits.
+      ctx.strokeStyle = '#e3b3d2';
+      ctx.lineWidth = r * 0.16;
+      ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.25, r * 0.3, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(r * 0.3, r * 0.3, r * 0.26, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -r * 0.35, r * 0.28, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#b57e9e';
+      ctx.lineWidth = lw;
+      ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.25, r * 0.3, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(r * 0.3, r * 0.3, r * 0.26, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, -r * 0.35, r * 0.28, 0, Math.PI * 2); ctx.stroke();
+      break;
+    }
+    default: {
+      // Unknown id: fall back to the ingredient's swatch colour.
+      const info = INGREDIENTS[id];
+      ctx.fillStyle = info ? info.color : '#cccccc';
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * The dish itself, drawn as the food its name promises — fried rice is a golden
+ * mound, mie goreng a noodle nest, sate skewers with peanut sauce, gado-gado a
+ * veg pile under peanut sauce, soto a bowl of yellow soup. Flat style, sized
+ * from r so it still reads at the tiny r=8 of a carried plate. `inWok` drops
+ * the soup bowl: in the wok the soto is a yellow mound being tossed.
+ */
+function drawDishFood(ctx, x, y, r, dishId, inWok) {
+  ctx.save();
+  ctx.translate(x, y);
+  const lw = Math.max(1, r * 0.09);
+  switch (dishId) {
+    case 'nasiGoreng': {
+      // Golden fried-rice mound with egg, greens and a chilli fleck.
+      ctx.fillStyle = '#e8a13c';
+      ctx.beginPath();
+      ctx.arc(0, r * 0.3, r * 0.78, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#f2c14e';
+      ctx.beginPath();
+      ctx.arc(-r * 0.1, r * 0.22, r * 0.55, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#fff8ea';
+      const grains = [[-0.4, -0.05], [-0.15, -0.35], [0.1, -0.1], [0.35, -0.3], [0.45, 0.05], [0, -0.5]];
+      for (const [gx, gy] of grains) {
+        ctx.beginPath(); ctx.arc(gx * r, gy * r, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = '#fffdf5';
+      ctx.beginPath(); ctx.arc(r * 0.3, -r * 0.15, r * 0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffb61e';
+      ctx.beginPath(); ctx.arc(r * 0.3, -r * 0.15, r * 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#58a34d';
+      ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.05, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.05, r * 0.1, r * 0.08, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d9381e';
+      ctx.beginPath(); ctx.arc(r * 0.42, -r * 0.05, r * 0.08, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'mieGoreng': {
+      // Noodle nest with egg and greens.
+      noodleStrand(ctx, r, -r * 0.35, 0, '#f2c14e', r * 0.3);
+      noodleStrand(ctx, r, 0, 2.1, '#e8a13c', r * 0.3);
+      noodleStrand(ctx, r, r * 0.35, 4.2, '#ffd97a', r * 0.3);
+      ctx.fillStyle = '#fffdf5';
+      ctx.beginPath(); ctx.arc(r * 0.35, -r * 0.35, r * 0.22, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffb61e';
+      ctx.beginPath(); ctx.arc(r * 0.35, -r * 0.35, r * 0.11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#58a34d';
+      ctx.beginPath(); ctx.arc(-r * 0.4, r * 0.2, r * 0.1, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.1, r * 0.35, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'sateAyam': {
+      // Two skewers of chicken with a peanut-sauce drizzle.
+      const stick = (x0, y0, x1, y1) => {
+        ctx.strokeStyle = '#8a6a42';
+        ctx.lineWidth = r * 0.12;
+        ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      };
+      stick(-r * 0.75, r * 0.45, r * 0.75, -r * 0.45);
+      stick(-r * 0.75, -r * 0.45, r * 0.75, r * 0.45);
+      const meat = (mx, my) => {
+        ctx.fillStyle = '#c96f3f';
+        roundRect(ctx, mx - r * 0.2, my - r * 0.2, r * 0.4, r * 0.4, r * 0.08);
+        ctx.fill();
+        ctx.strokeStyle = '#a8542f';
+        ctx.lineWidth = lw;
+        ctx.stroke();
+      };
+      meat(-r * 0.4, r * 0.24); meat(0, 0); meat(r * 0.4, -r * 0.24);
+      meat(-r * 0.4, -r * 0.24); meat(r * 0.4, r * 0.24);
+      ctx.strokeStyle = '#e8c07a';
+      ctx.lineWidth = r * 0.14;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.6, r * 0.1);
+      ctx.quadraticCurveTo(0, -r * 0.15, r * 0.6, r * 0.05);
+      ctx.stroke();
+      ctx.fillStyle = '#58a34d';
+      ctx.beginPath(); ctx.arc(-r * 0.55, -r * 0.35, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'gadoGado': {
+      // Mixed veg under peanut sauce, with egg and crispy shallots.
+      ctx.save(); ctx.rotate(-0.5); leaf(ctx, r * 0.8, '#58a34d'); ctx.restore();
+      ctx.save(); ctx.rotate(0.5); leaf(ctx, r * 0.8, '#7dc383'); ctx.restore();
+      leaf(ctx, r * 0.8, '#6db35f');
+      ctx.fillStyle = '#fffdf5';
+      ctx.beginPath(); ctx.arc(r * 0.4, -r * 0.35, r * 0.22, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffb61e';
+      ctx.beginPath(); ctx.arc(r * 0.4, -r * 0.35, r * 0.11, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#d9a05b';
+      ctx.lineWidth = r * 0.22;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.6, r * 0.25);
+      ctx.quadraticCurveTo(0, r * 0.05, r * 0.6, r * 0.2);
+      ctx.stroke();
+      ctx.fillStyle = '#f2c14e';
+      ctx.beginPath(); ctx.arc(-r * 0.35, r * 0.35, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.15, r * 0.4, r * 0.08, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d9381e';
+      ctx.beginPath(); ctx.arc(r * 0.55, r * 0.3, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'sotoAyam': {
+      if (inWok) {
+        // In the wok the soup is a yellow mound being tossed, no bowl.
+        ctx.fillStyle = '#e8c85a';
+        ctx.beginPath();
+        ctx.arc(0, r * 0.3, r * 0.78, Math.PI, 0);
+        ctx.fill();
+        ctx.fillStyle = '#f2d878';
+        ctx.beginPath();
+        ctx.arc(-r * 0.1, r * 0.22, r * 0.55, Math.PI, 0);
+        ctx.fill();
+      } else {
+        // Bowl of yellow chicken soup.
+        ctx.fillStyle = '#3f6fb5';
+        ctx.beginPath();
+        ctx.arc(0, r * 0.1, r * 0.82, 0, Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#e8c85a';
+        ctx.beginPath();
+        ctx.arc(0, r * 0.1, r * 0.7, Math.PI, 0);
+        ctx.fill();
+        ctx.fillStyle = '#f2d878';
+        ctx.beginPath();
+        ctx.arc(0, -r * 0.05, r * 0.45, Math.PI, 0);
+        ctx.fill();
+      }
+      // Chicken shreds, greens and shallots on top.
+      ctx.strokeStyle = '#f5ecd7';
+      ctx.lineWidth = r * 0.12;
+      ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-r * 0.4, -r * 0.25); ctx.lineTo(-r * 0.1, -r * 0.4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(r * 0.05, -r * 0.15); ctx.lineTo(r * 0.35, -r * 0.35); ctx.stroke();
+      ctx.fillStyle = '#58a34d';
+      ctx.beginPath(); ctx.arc(-r * 0.35, -r * 0.05, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.3, -r * 0.05, r * 0.08, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#c98a3d';
+      ctx.beginPath(); ctx.arc(0, -r * 0.35, r * 0.08, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    default: {
+      ctx.fillStyle = RECIPES[dishId] ? RECIPES[dishId].plate : '#cccccc';
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.68, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
 }
 
 /** A plate with the dish on it, drawn big enough to read at a glance. */
@@ -55,17 +439,99 @@ function drawPlate(ctx, x, y, r, dishId) {
   ctx.strokeStyle = '#c9b98f';
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.fillStyle = RECIPES[dishId].plate;
+  drawDishFood(ctx, x, y, r * 0.72, dishId, false);
+}
+
+/** A small wooden stool, sized from r; legLen reaches the floor or the table it tucks under. */
+function drawStool(ctx, x, y, r, legLen) {
+  ctx.fillStyle = '#5d3c22';
+  ctx.fillRect(x - r * 0.5, y + 4, r * 0.14, legLen);
+  ctx.fillRect(x + r * 0.36, y + 4, r * 0.14, legLen);
+  ctx.fillStyle = '#96683d';
   ctx.beginPath();
-  ctx.arc(x, y, r * 0.68, 0, Math.PI * 2);
+  ctx.ellipse(x, y, r, r * 0.32, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Garnish flecks so the dish reads as food, not a flat disc.
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.beginPath(); ctx.arc(x - r * 0.25, y - r * 0.2, r * 0.12, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#7dc383';
-  ctx.beginPath(); ctx.arc(x + r * 0.3, y + r * 0.15, r * 0.12, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#d9381e';
-  ctx.beginPath(); ctx.arc(x + r * 0.1, y - r * 0.35, r * 0.09, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#a87f52';
+  ctx.beginPath();
+  ctx.ellipse(x, y - 2, r * 0.85, r * 0.24, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** A customer dining table (meja makan): far stool, wooden top, a plate of food
+ *  and two glasses of teh on it, near stool. The stools match the table's wood. */
+function drawDiningTable(ctx, tx, ty, dishId) {
+  drawStool(ctx, tx, ty - 46, 20, 32);
+  ctx.fillStyle = '#5d3c22';
+  ctx.fillRect(tx - 54, ty + 10, 8, 30);
+  ctx.fillRect(tx + 46, ty + 10, 8, 30);
+  ctx.fillStyle = '#8a6a42';
+  roundRect(ctx, tx - 66, ty - 14, 132, 26, 10);
+  ctx.fill();
+  ctx.fillStyle = '#a87f52';
+  roundRect(ctx, tx - 66, ty - 14, 132, 8, 6);
+  ctx.fill();
+  drawPlate(ctx, tx - 28, ty - 26, 13, dishId);
+  ctx.fillStyle = '#f5ecd7';
+  ctx.fillRect(tx + 18, ty - 32, 10, 18);
+  ctx.fillStyle = '#c96f3f';
+  ctx.fillRect(tx + 19, ty - 24, 8, 9);
+  ctx.fillStyle = '#f5ecd7';
+  ctx.fillRect(tx + 34, ty - 32, 10, 18);
+  ctx.fillStyle = '#c96f3f';
+  ctx.fillRect(tx + 35, ty - 24, 8, 9);
+  drawStool(ctx, tx, ty + 54, 22, 22);
+}
+
+/** The night-warung busker (pengamen): cap, striped shirt, guitar, a tip hat
+ *  at his feet and a music note drifting above the strings. */
+function drawBusker(ctx, x, y, time) {
+  const bob = Math.sin(time * 2) * 1.5;
+  ctx.save();
+  ctx.translate(x, y + bob);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath(); ctx.ellipse(0, 40, 22, 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#3a2a1e';
+  ctx.beginPath(); ctx.ellipse(30, 42, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#f2c14e';
+  ctx.beginPath(); ctx.arc(27, 40, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(33, 41, 2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#2b2b3d';
+  ctx.fillRect(-10, 14, 8, 24);
+  ctx.fillRect(2, 14, 8, 24);
+  ctx.fillStyle = '#1c1917';
+  ctx.fillRect(-12, 36, 12, 5);
+  ctx.fillRect(0, 36, 12, 5);
+  ctx.fillStyle = '#c96f3f';
+  roundRect(ctx, -14, -16, 28, 32, 10);
+  ctx.fill();
+  ctx.fillStyle = '#f5ecd7';
+  ctx.fillRect(-14, -6, 28, 5);
+  ctx.fillRect(-14, 4, 28, 5);
+  ctx.fillStyle = '#e8b48a';
+  ctx.beginPath(); ctx.arc(0, -24, 10, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#3a2a1e';
+  ctx.beginPath(); ctx.arc(0, -26, 10, Math.PI, 0); ctx.fill();
+  ctx.fillRect(-10, -28, 22, 4);
+  ctx.save();
+  ctx.translate(10, 2);
+  ctx.rotate(-0.5);
+  ctx.fillStyle = '#8a5a2e';
+  ctx.beginPath(); ctx.ellipse(0, 0, 15, 11, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#1c1917';
+  ctx.beginPath(); ctx.arc(2, 0, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#6b4a2f';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(10, -4); ctx.lineTo(26, -14); ctx.stroke();
+  ctx.fillStyle = '#5d3c22';
+  ctx.fillRect(24, -18, 6, 8);
+  ctx.restore();
+  ctx.strokeStyle = '#e8b48a';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(8, -10); ctx.lineTo(16, 2); ctx.stroke();
+  text(ctx, '♪', 34, -34 + Math.sin(time * 2 + 1) * 3, 16, '#ffb347', 700, 'center');
+  ctx.restore();
 }
 
 function drawTicket(ctx, ticket, x, y, w, h) {
@@ -83,7 +549,7 @@ function drawTicket(ctx, ticket, x, y, w, h) {
   // Ingredient chips: what the cook still has to fetch for this dish.
   let cx = x + 12;
   for (const need of recipe.needs) {
-    ingredientBlob(ctx, cx, y + 34, 7, need);
+    drawIngredient(ctx, cx, y + 34, 7, need);
     cx += 19;
   }
   // Patience bar drains; red and pulsing when the ticket is about to burn.
@@ -100,7 +566,9 @@ function drawTicket(ctx, ticket, x, y, w, h) {
 
 function drawFlameMeter(ctx, wok, x, y, w) {
   const marker = Math.sin(wok.phase) * 0.85;
-  text(ctx, 'API', x, y - 8, 11, COLORS.cream, 700);
+  // The label sits left of the bar, never under the marker triangle — a marker
+  // at the bar's left end used to cover the "P" and read as "AY!".
+  text(ctx, 'API', x - 8, y + 8, 11, COLORS.cream, 700, 'right');
   // Red bed, yellow band, green heart — the marker must land in the green.
   ctx.fillStyle = '#7a1f1f';
   roundRect(ctx, x, y, w, 16, 8);
@@ -159,7 +627,7 @@ function drawCook(ctx, player, carrying, time) {
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.arc(ix, iy, 12, 0, Math.PI * 2); ctx.fill();
     if (RECIPES[item]) drawPlate(ctx, ix, iy, 11, item);
-    else ingredientBlob(ctx, ix, iy, 10, item);
+    else drawIngredient(ctx, ix, iy, 10, item);
   });
   ctx.restore();
 }
@@ -175,7 +643,7 @@ function drawRecipesStrip(ctx, x, y, w) {
     text(ctx, recipe.label, rx, y + 27, 12, COLORS.cream, 800);
     let cx = rx + 6;
     for (const need of recipe.needs) {
-      ingredientBlob(ctx, cx, y + 45, 6, need);
+      drawIngredient(ctx, cx, y + 45, 6, need);
       cx += 16;
     }
     text(ctx, recipe.tosses + 'x toss', rx, y + 61, 10, COLORS.muted, 600);
@@ -225,6 +693,25 @@ export function createRenderer(canvas) {
     glow.addColorStop(1, 'rgba(255,179,71,0)');
     ctx.fillStyle = glow;
     ctx.fillRect(0, 280, VIEW.width, 440);
+    // The kitchen counter (meja dapur): a long wooden counter the crates, the
+    // board, the wok and the serving window all sit on.
+    ctx.fillStyle = '#5d3c22';
+    ctx.fillRect(20, 198, 1240, 98);
+    ctx.fillStyle = '#8a6a42';
+    ctx.fillRect(16, 180, 1248, 18);
+    ctx.fillStyle = '#a87f52';
+    ctx.fillRect(16, 180, 1248, 4);
+    ctx.strokeStyle = '#4a2e18';
+    ctx.lineWidth = 2;
+    for (let x = 140; x < 1260; x += 120) {
+      ctx.beginPath(); ctx.moveTo(x, 202); ctx.lineTo(x, 290); ctx.stroke();
+    }
+    ctx.fillStyle = '#4a2e18';
+    ctx.fillRect(20, 288, 1240, 8);
+    // Customer dining tables with matching stools, and the busker by the wall.
+    drawDiningTable(ctx, 330, 630, 'nasiGoreng');
+    drawDiningTable(ctx, 950, 630, 'sotoAyam');
+    drawBusker(ctx, 1150, 625, time);
     // Woven mat the cook stands on, and the props at the floor's edges.
     ctx.fillStyle = '#6b4a2f';
     ctx.fillRect(0, 296, VIEW.width, 8);
@@ -269,7 +756,7 @@ export function createRenderer(canvas) {
       ctx.fill();
       ctx.fillStyle = COLORS.woodDark;
       ctx.fillRect(crate.x, crate.y + crate.h - 12, crate.w, 12);
-      ingredientBlob(ctx, crate.x + crate.w / 2, crate.y + 24, 13, crate.id);
+      drawIngredient(ctx, crate.x + crate.w / 2, crate.y + 24, 13, crate.id);
       text(ctx, info.short || info.label, crate.x + crate.w / 2, crate.y + crate.h - 5, 10, COLORS.cream, 700, 'center');
       highlight('crate', crate.id, crate.x, crate.y, crate.w, crate.h);
     }
@@ -282,15 +769,22 @@ export function createRenderer(canvas) {
     roundRect(ctx, b.x + 14, b.y + 14, b.w - 28, b.h - 28, 6);
     ctx.fill();
     text(ctx, b.label, b.x + b.w / 2, b.y - 12, 12, COLORS.cream, 800, 'center');
-    const choppable = state.player.carry.find((c) => INGREDIENTS[c] && INGREDIENTS[c].chopped);
-    if (choppable) {
-      ingredientBlob(ctx, b.x + 60, b.y + 38, 12, choppable);
+    const choppables = state.player.carry.filter((c) => INGREDIENTS[c] && INGREDIENTS[c].chopped);
+    if (choppables.length > 0) {
+      // Every choppable ingredient in hand lies on the board as the real food.
+      choppables.forEach((item, i) => {
+        drawIngredient(ctx, b.x + 42 + i * 46, b.y + 36, 12, item);
+      });
+      // The chopped result appears beside the raw pile once the board is half done.
+      if (state.boardProgress > 0.5) {
+        drawIngredient(ctx, b.x + 42 + choppables.length * 46, b.y + 36, 10, INGREDIENTS[choppables[0]].chopped);
+      }
       if (state.boardProgress > 0) {
         ctx.fillStyle = '#e5d9bd';
-        roundRect(ctx, b.x + 100, b.y + 32, 52, 10, 5);
+        roundRect(ctx, b.x + 24, b.y + 52, b.w - 48, 9, 4);
         ctx.fill();
         ctx.fillStyle = COLORS.green;
-        roundRect(ctx, b.x + 100, b.y + 32, 52 * state.boardProgress, 10, 5);
+        roundRect(ctx, b.x + 24, b.y + 52, (b.w - 48) * state.boardProgress, 9, 4);
         ctx.fill();
       }
     } else {
@@ -298,8 +792,8 @@ export function createRenderer(canvas) {
       ctx.strokeStyle = '#c8ccd4';
       ctx.lineWidth = 5;
       ctx.beginPath(); ctx.moveTo(b.x + 110, b.y + 22); ctx.lineTo(b.x + 150, b.y + 50); ctx.stroke();
-      ingredientBlob(ctx, b.x + 45, b.y + 40, 7, 'bawangCincang');
-      ingredientBlob(ctx, b.x + 65, b.y + 48, 7, 'ayamCincang');
+      drawIngredient(ctx, b.x + 45, b.y + 40, 7, 'bawangCincang');
+      drawIngredient(ctx, b.x + 65, b.y + 48, 7, 'ayamCincang');
     }
     text(ctx, 'tahan E', b.x + b.w / 2, b.y + b.h + 12, 11, COLORS.muted, 600, 'center');
     highlight('board', null, b.x, b.y, b.w, b.h);
@@ -328,9 +822,13 @@ export function createRenderer(canvas) {
     ctx.fill();
     // Whatever is in the wok shows as coloured morsels.
     state.wok.items.forEach((item, i) => {
-      ingredientBlob(ctx, w.x + 70 + i * 17, w.y + 38 + (i % 2) * 5, 7, item);
+      drawIngredient(ctx, w.x + 70 + i * 17, w.y + 38 + (i % 2) * 5, 7, item);
     });
     if (state.wok.cooking) {
+      // The dish itself heaps in the wok while it is tossed — the name on the
+      // label and the food in the bowl are the same dish.
+      const bounce = -Math.abs(Math.sin(time * 9)) * 4;
+      drawDishFood(ctx, w.x + 95, w.y + 32 + bounce, 26, state.wok.dish, true);
       text(ctx, RECIPES[state.wok.dish].label, w.x + w.w / 2, w.y + 66, 12, '#ffd94d', 800, 'center');
       drawFlameMeter(ctx, state.wok, w.x + 8, w.y - 34, w.w - 60);
     } else if (state.wok.doneDish) {
@@ -443,7 +941,10 @@ export function createRenderer(canvas) {
       const x = 640 + (i - 2) * 210;
       drawPlate(ctx, x, 590, 34, id);
       text(ctx, recipe.label, x, 640, 14, COLORS.cream, 800, 'center');
-      text(ctx, recipe.needs.map((n) => INGREDIENTS[n].label).join(' + '), x, 662, 11, COLORS.muted, 600, 'center');
+      // Short forms keep the five ingredient lists from running into each other.
+      const short = { 'Ayam Cincang': 'Ayam Cinc.', 'Bawang Cincang': 'Bwg Cinc.', 'Bawang Goreng': 'Bwg Goreng' };
+      const needsText = recipe.needs.map((n) => short[INGREDIENTS[n].label] || INGREDIENTS[n].label).join(' + ');
+      text(ctx, needsText, x, 662, 11, COLORS.muted, 600, 'center');
     });
   }
 

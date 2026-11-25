@@ -167,6 +167,14 @@ function runAutopilot(world, seconds) {
   return events;
 }
 
+/** Staged frames are stills: fade-out feedback text (pickup notes, perfect-toss
+ *  calls) is cleared so it never lands on top of a station label. The frame
+ *  stays a real game state — only the transient text is gone. */
+function clearTransientFx(state) {
+  state.floaters.length = 0;
+  state.particles.length = 0;
+}
+
 /**
  * Set `world` to the named scene and return the screen to draw over it.
  * cover: mid-service, wok cooking in the green, three tickets, a plate at the window.
@@ -180,12 +188,15 @@ export function stageShot(name, world) {
   if (name === 'prep') {
     runAutopilot(world, 14);
     // Park the cook at the board mid-chop with chopped stock on the counter.
+    // Slightly left and low, so the ingredients carried above the hat clear
+    // the board's food and the "tahan E" label.
     const board = standPoint(STATIONS.board);
-    state.player.x = board.x;
-    state.player.y = board.y;
+    state.player.x = board.x - 55;
+    state.player.y = board.y + 14;
     state.player.carry = ['bawang', 'ayam'];
     state.boardProgress = 0.62;
     state.lastChopQuarter = 2;
+    clearTransientFx(state);
     return { screen: SCREEN_PLAY, best: 0 };
   }
   if (name === 'rush') {
@@ -205,6 +216,7 @@ export function stageShot(name, world) {
       state.wok.phase = 0.6;
       state.wok.greenCenter = 0.15;
     }
+    clearTransientFx(state);
     return { screen: SCREEN_PLAY, best: state.coins };
   }
   if (name === 'end') {
@@ -216,6 +228,7 @@ export function stageShot(name, world) {
       const coins = state.coins;
       state.stars = coins >= 1250 ? 3 : coins >= 800 ? 2 : coins >= 400 ? 1 : 0;
     }
+    clearTransientFx(state);
     return { screen: SCREEN_OVER, best: state.coins };
   }
   // cover (default): a busy mid-service frame.
@@ -242,5 +255,6 @@ export function stageShot(name, world) {
   state.player.y = wokPoint.y + 12;
   if (state.player.carry.length === 0) state.player.carry = ['telur'];
   state.timeLeft = 132;
+  clearTransientFx(state);
   return { screen: SCREEN_PLAY, best: state.coins };
 }
